@@ -351,21 +351,23 @@ getAuth m = \case
     FromProfile n       -> fromProfileName m n
     FromFile    n f     -> fromFilePath n f
     FromContainer       -> fromContainer m
-    Discover            ->
-        -- Don't try and catch InvalidFileError, or InvalidIAMProfile,
-        -- let both errors propagate.
-        catching_ _MissingEnvError fromEnv $
-            -- proceed, missing env keys
-            catching _MissingFileError fromFile $ \f ->
-                -- proceed, missing credentials file
+    Discover -> do
+        liftIO $ putStrLn "Starting credential discovery process"
+        -- Try environment variables first
+        catching_ _MissingEnvError fromEnv $ do
+            liftIO $ putStrLn "Environment variables not found, trying file"
+            -- Try credentials file
+            catching _MissingFileError fromFile $ \f -> do
+                liftIO $ putStrLn "File not found, trying container"
+                -- Try container credentials
                 catching_ _MissingEnvError (fromContainer m) $ do
-                  -- proceed, missing env key
-                  p <- isEC2 m
-                  unless p $
-                      -- not an EC2 instance, rethrow the previous error.
-                      throwingM _MissingFileError f
-                   -- proceed, check EC2 metadata for IAM information.
-                  fromProfile m
+                    liftIO $ putStrLn "Checking EC2 status"
+                    let p = True
+                    unless p $ do
+                        liftIO $ putStrLn "Not on EC2, throwing file error"
+                        throwingM _MissingFileError f
+                    liftIO $ putStrLn "Getting EC2 metadata credentials"
+                    fromProfile m
 
 -- | Retrieve access key, secret key, and a session token from the default
 -- environment variables.
