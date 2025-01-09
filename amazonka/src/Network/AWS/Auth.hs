@@ -362,7 +362,9 @@ getAuth m = \case
                 -- Try container credentials
                 catching_ _MissingEnvError (fromContainer m) $ do
                     liftIO $ putStrLn "Checking EC2 status"
-                    let p = True
+                    p <- isEC2 m
+                    liftIO $ putStrLn ("Checked EC2 status - " <> show p)
+                    -- let p = True
                     unless p $ do
                         liftIO $ putStrLn "Not on EC2, throwing file error"
                         throwingM _MissingFileError f
